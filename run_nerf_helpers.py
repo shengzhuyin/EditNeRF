@@ -1,4 +1,5 @@
-from torchsearchsorted import searchsorted
+# from torchsearchsorted import searchsorted
+from torch import searchsorted
 import numpy as np
 import torch
 torch.autograd.set_detect_anomaly(True)

@@ -58,12 +58,14 @@ def load_blender_data(basedir, trainskip=1, testskip=1, skip_val_test=False):
         else:
             skip = max(testskip, 1)
         for frame in meta['frames'][::skip]:
+            frame['file_path'] = frame['file_path'].strip('.png')
             fname = os.path.join(basedir, frame['file_path'] + '.png')
             if skip_val_test and s in ('val', 'test'):
                 # HACK: we don't have images for test/val views, but we'd at least like to see the rendered views
                 imgs.append(np.zeros(all_imgs[-1][-1].shape))
             else:
-                imgs.append(imageio.imread(fname, ignoregamma=True, pilmode='RGB'))
+                # imgs.append(imageio.imread(fname, ignoregamma=True, pilmode='RGB'))
+                imgs.append(imageio.imread(fname, pilmode='RGB'))
             poses.append(np.array(frame['transform_matrix']))
 
         imgs = (np.array(imgs) / 255.).astype(np.float32)
@@ -87,7 +89,7 @@ def load_blender_data(basedir, trainskip=1, testskip=1, skip_val_test=False):
     return imgs, poses, [H, W, focal], i_split
 
 
-def load_chairs(basedir, args):
+def load_chairs(basedir, args, num_images):
     all_imgs = []
     all_poses = []
     all_i_split = [[], [], []]
@@ -105,7 +107,12 @@ def load_chairs(basedir, args):
             if args.instance >= 0:
                 instance_names = [instance_names[args.instance]]
 
-    for instance in instance_names:
+    from tqdm import tqdm
+    if num_images is not None:
+        instance_names = instance_names[:num_images]
+        
+    for instance in tqdm(instance_names):
+        print(f"loading {instance = }")
         imgs, poses, hwf, i_split = load_blender_data(instance, args.trainskip, args.testskip, skip_val_test=args.real_image_dir)
         hwfs += [hwf for _ in range(imgs.shape[0])]
         N_train, N_val, N_test = [len(x) for x in i_split]

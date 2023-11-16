@@ -162,9 +162,9 @@ class NerfDataset():
         return batch_rays, target_s, style, H, W, focal, near, far, viewdirs_reg
 
 
-def load_data(args):
+def load_data(args, num_images = None):
     print('Loading data')
-    images, poses, hwfs, i_split, style_inds = load_chairs(args.datadir, args)
+    images, poses, hwfs, i_split, style_inds = load_chairs(args.datadir, args, num_images)
     i_train, i_val, i_test = i_split
 
     near = args.blender_near

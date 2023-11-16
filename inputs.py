@@ -95,3 +95,4 @@ def config_parser():
                         help='frequency of render_poses video saving')
 
     return parser
+
