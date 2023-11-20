@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(42)
 
 def interpolate():
-    INTERPO_COLOR = False
+    INTERPO_COLOR = True
     
     parser = config_parser()
     args = parser.parse_args()

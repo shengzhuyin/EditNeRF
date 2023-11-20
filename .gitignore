@@ -2,3 +2,5 @@
 .DS_Store/
 
 data/
+archive/
+logs/*/*/*png
