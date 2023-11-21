@@ -13,7 +13,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(42)
 
 def interpolate():
-    INTERPO_COLOR = True
+    INTEROP_TYPE = "WALK"
+    INTEROP_TYPE_LIST = ["COLOR", "SHAPE", "WALK"]
+    assert INTEROP_TYPE in INTEROP_TYPE_LIST, f"interop type should be one of {INTEROP_TYPE_LIST}, passed {INTEROP_TYPE}"
     
     parser = config_parser()
     args = parser.parse_args()
@@ -21,8 +23,8 @@ def interpolate():
     images, poses, style, i_test, i_train, bds_dict, dataset, hwfs, near_fars, _ = load_data(args, num_images = 4)
     images_test, poses_test, style_test, hwfs_test, nf_test = images[i_test], poses[i_test], style[i_test], hwfs[i_test], near_fars[i_test]
     images_train, poses_train, style_train, hwfs_train, nf_train = images[i_train], poses[i_train], style[i_train], hwfs[i_train], near_fars[i_train]
-    print(f"[DEBUG] {i_test = }, {style_test.shape = }, {style_test = }")
-    print(f"[DEBUG] {style.shape = }, {style = }")
+    # print(f"[DEBUG] {i_test = }, {style_test.shape = }, {style_test = }")
+    # print(f"[DEBUG] {style.shape = }, {style = }")
 
     # Create log dir and copy the config file
     basedir = args.basedir
@@ -35,7 +37,7 @@ def interpolate():
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
     
-    print(f"[DEBUG] {poses_test.shape = }, {style_test.shape = }, {hwfs_test.shape = }, {nf_test.shape = }")
+    # print(f"[DEBUG] {poses_test.shape = }, {style_test.shape = }, {hwfs_test.shape = }, {nf_test.shape = }")
     
     # pick one pose
     n = poses_test.shape[0]
@@ -75,16 +77,71 @@ def interpolate():
         shape_interpolations = torch.stack(shape_interpolations)
         return shape_interpolations
     
+    def load_w_fromcheckpoint():
+        import torch, pytorch_lightning as pl, numpy as np
+        from walk_learning import WalkLearner
+        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_8/checkpoints/walk-nerf-epoch=09.ckpt")
+        # get value from state_dict
+        w = model["state_dict"]['w']
+        return w
+    
+    def interpolate_vector(base_style, w, walk_direction:int, n):
+        assert walk_direction >=-1 and walk_direction <= 2, f"walk_direction should be -1, 0, 1 or 2, passed {walk_direction}"
+        #get alphas evenly spaced from 0 to 2
+        alphas = torch.linspace(0, 2, n)
+        print(f"[DEBUG] Generated {alphas = }")
+        
+        if walk_direction != -1:
+            alpha_ = torch.zeros(size = (n, 3))
+            alpha_[:, walk_direction] = alphas
+            print(f"[DEBUG] Generated {alpha_ = }")
+            
+            displacement = torch.matmul(alpha_, w.T)
+            new_ = torch.zeros(size = (n, args.style_dim))
+            for i in range(n):
+                disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
+                assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
+                new_[i] = disp
+            displacement = new_
+            
+            assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+            
+        else: 
+            alpha_ = torch.stack([alphas] * 3, dim = 1)
+            print(f"[DEBUG] Generated {alpha_ = }")
+            
+            displacement = torch.matmul(alpha_, w.T)
+            new_ = torch.zeros(size = (n, args.style_dim))
+            for i in range(n):
+                disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
+                assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
+                new_[i] = disp
+            displacement = new_
+            
+            assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+            
+        print(f"[DEBUG] {displacement.norm() = }, {displacement}")
+        
+        interpolated_styles = base_style.reshape(1,-1) + displacement
+        assert interpolated_styles.shape == (n, args.style_dim), f"{interpolated_styles.shape = }"
+        
+        return interpolated_styles
+    
     base_style = style_test[index]
     second_style = style_test[color_idx]
     assert base_style.shape == (args.style_dim, )
 
-    if INTERPO_COLOR:
+    if INTEROP_TYPE == "COLOR":
         style_test = interpolate_color(base_style, second_style, N)
-        print(f"[DEBUG] {style_test[0] - style_test[1]}")
-    else :
+        print(f"[DEBUG] {style_test[0] - style_test[1] = }")
+    elif INTEROP_TYPE == "SHAPE":
         style_test = interpolate_shape(base_style, second_style, N)
-        print(f"[DEBUG] {style_test[0] - style_test[1]}")
+        print(f"[DEBUG] {style_test[0] - style_test[1] = }")
+    else : 
+        w = load_w_fromcheckpoint()
+        print(f"[INFO] Loaded walk vector {w = }")
+        style_test = interpolate_vector(base_style, w, walk_direction = -1, n = N)
+        print(f"[DEBUG] {style_test[0] - style_test[1] = }")
     
     print(f"[DEBUG] {poses_test.shape = }, {style_test.shape = }, {hwfs_test.shape = }, {nf_test.shape = }")
         
@@ -92,7 +149,8 @@ def interpolate():
         # pick one poses_test, hwfs_test, nf_test
         # and interpolate between two styles (style_test), keep the shape same and interpolate colors.
         
-        testsavedir = os.path.join(basedir, expname, 'interpolation_INTERPO_COLOR' if INTERPO_COLOR else "interpolation_INTERPO_SHAPE")
+        path = f"interpolation_INTERPO_{INTEROP_TYPE}"
+        testsavedir = os.path.join(basedir, expname, path)
         os.makedirs(testsavedir, exist_ok=True)
         _, _, psnr = render_path(poses_test.to(device), style_test, hwfs_test, args.chunk, render_kwargs_test, nfs=nf_test, gt_imgs=None, savedir=testsavedir)
         print('Saved interpolation set w/ psnr', psnr)

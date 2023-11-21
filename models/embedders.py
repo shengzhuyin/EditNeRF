@@ -27,7 +27,11 @@ class Embedder:
 
         for freq in freq_bands:
             for p_fn in self.kwargs['periodic_fns']:
-                embed_fns.append(lambda x, p_fn=p_fn, freq=freq: p_fn(x * freq))
+                def sample_fn(x, p_fn=p_fn, freq=freq):
+                    freq = freq.to(x.device)
+                    return p_fn(x * freq)
+                # embed_fns.append(lambda x, p_fn=p_fn, freq=freq: p_fn(x * freq))
+                embed_fns.append(sample_fn)
                 out_dim += d
 
         self.embed_fns = embed_fns
@@ -52,4 +56,4 @@ def get_embedder(multires, i=0):
 
     embedder_obj = Embedder(**embed_kwargs)
     def embed(x, eo=embedder_obj): return eo.embed(x)
-    return embed, embedder_obj.out_dim
+    return embed, embedder_obj.out_dim    # return to port model to the correct device

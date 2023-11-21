@@ -5,4 +5,6 @@ data/
 archive/
 logs/*/*/*png
 *tar
-*.[log,out,pkl]
+*[.log, .out, .pkl]
+*npy
+*pyc
