@@ -4,3 +4,5 @@
 data/
 archive/
 logs/*/*/*png
+*tar
+*.[log,out,pkl]
