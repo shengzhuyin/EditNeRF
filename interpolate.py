@@ -80,8 +80,7 @@ def interpolate():
     def load_w_fromcheckpoint():
         import torch, pytorch_lightning as pl, numpy as np
         from walk_learning import WalkLearner
-        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_8/checkpoints/walk-nerf-epoch=09.ckpt")
-        # get value from state_dict
+        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_17/checkpoints/last.ckpt")
         w = model["state_dict"]['w']
         return w
     
