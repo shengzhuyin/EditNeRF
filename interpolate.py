@@ -13,8 +13,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(42)
 
 def interpolate():
-    INTEROP_TYPE = "WALK"
-    INTEROP_TYPE_LIST = ["COLOR", "SHAPE", "WALK"]
+    INTEROP_TYPE = "ZOOM_TEST"
+    INTEROP_TYPE_LIST = ["COLOR", "SHAPE", "COLOR_TEST", "ZOOM_TEST"]
     assert INTEROP_TYPE in INTEROP_TYPE_LIST, f"interop type should be one of {INTEROP_TYPE_LIST}, passed {INTEROP_TYPE}"
     
     parser = config_parser()
@@ -80,51 +80,82 @@ def interpolate():
     def load_w_fromcheckpoint():
         import torch, pytorch_lightning as pl, numpy as np
         from walk_learning import WalkLearner
-        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_17/checkpoints/last.ckpt")
+        # model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_17/checkpoints/last.ckpt")
+        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_33/checkpoints/last.ckpt")
         w = model["state_dict"]['w']
         return w
     
     def interpolate_vector(base_style, w, walk_direction:int, n):
         assert walk_direction >=-1 and walk_direction <= 2, f"walk_direction should be -1, 0, 1 or 2, passed {walk_direction}"
-        #get alphas evenly spaced from 0 to 2
-        alphas = torch.linspace(0, 2, n)
-        print(f"[DEBUG] Generated {alphas = }")
         
-        if walk_direction != -1:
-            alpha_ = torch.zeros(size = (n, 3))
-            alpha_[:, walk_direction] = alphas
-            print(f"[DEBUG] Generated {alpha_ = }")
+        if w.shape[1] == 3:
+            # this is a color walk, not a zoom walk
+            assert INTEROP_TYPE == "COLOR_TEST", f"interop type should be COLOR_TEST, passed {INTEROP_TYPE}"
+            print(f"[INFO] Doing a color walk ...")
+            assert w.shape == (args.style_dim//2, 3), f"{w.shape = }"
             
-            displacement = torch.matmul(alpha_, w.T)
-            new_ = torch.zeros(size = (n, args.style_dim))
-            for i in range(n):
-                disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
-                assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
-                new_[i] = disp
-            displacement = new_
+            #get alphas evenly spaced from 0 to 2
+            alphas = torch.linspace(0, 2, n)
+            print(f"[DEBUG] Generated {alphas = }")
             
-            assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+            if walk_direction != -1:    # interpolate in a single color
+                alpha_ = torch.zeros(size = (n, 3))
+                alpha_[:, walk_direction] = alphas
+                print(f"[DEBUG] Generated {alpha_ = }")
+                
+                displacement = torch.matmul(alpha_, w.T)
+                new_ = torch.zeros(size = (n, args.style_dim))
+                for i in range(n):
+                    disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
+                    assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
+                    new_[i] = disp
+                displacement = new_
+                
+                assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+                
+            else: # interpolate in all colors
+                alpha_ = torch.stack([alphas] * 3, dim = 1)
+                print(f"[DEBUG] Generated {alpha_ = }")
+                
+                displacement = torch.matmul(alpha_, w.T)
+                new_ = torch.zeros(size = (n, args.style_dim))
+                for i in range(n):
+                    disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
+                    assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
+                    new_[i] = disp
+                displacement = new_
+                
+                assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+                
+            print(f"[DEBUG] {displacement.norm() = }, {displacement}")
             
-        else: 
-            alpha_ = torch.stack([alphas] * 3, dim = 1)
-            print(f"[DEBUG] Generated {alpha_ = }")
+            interpolated_styles = base_style.reshape(1,-1) + displacement
+            assert interpolated_styles.shape == (n, args.style_dim), f"{interpolated_styles.shape = }"
             
-            displacement = torch.matmul(alpha_, w.T)
-            new_ = torch.zeros(size = (n, args.style_dim))
-            for i in range(n):
-                disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
-                assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
-                new_[i] = disp
-            displacement = new_
+            return interpolated_styles
+
+        elif w.shape[1] == 1:
+            # this is a zoom walk, not a color walk
+            assert INTEROP_TYPE == "ZOOM_TEST", f"interop type should be ZOOM_TEST, passed {INTEROP_TYPE}"
+            print(f"[INFO] Doing a zoom walk ...")
+            assert w.shape == (args.style_dim, 1), f"{w.shape = }"
             
-            assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+            #get alphas evenly spaced from 0 to 2
+            alphas = torch.linspace(0, 2, n)
+            print(f"[DEBUG] Generated {alphas = }")
             
-        print(f"[DEBUG] {displacement.norm() = }, {displacement}")
+            displacements = torch.matmul(alphas.reshape(-1, 1), w.T)
+            assert displacements.shape == (n, args.style_dim), f"{displacements.shape = }"
+            
+            interpolated_styles = base_style.reshape(1,-1) + displacements
+            print(f"[DEBUG] {displacements.norm() = }, {displacements}")
+            print(f"[DEBUG] {base_style.shape = }, {base_style = }")
+            print(f"[DEBUG] {interpolated_styles.shape = }, {interpolated_styles = }")
+            
+            return interpolated_styles
         
-        interpolated_styles = base_style.reshape(1,-1) + displacement
-        assert interpolated_styles.shape == (n, args.style_dim), f"{interpolated_styles.shape = }"
-        
-        return interpolated_styles
+        else:
+            raise RuntimeError(f"walk vector should be of shape (N, 3) or (N, 1), passed {w.shape = }")
     
     base_style = style_test[index]
     second_style = style_test[color_idx]
