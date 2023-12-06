@@ -30,7 +30,7 @@ basedir = args.basedir
 expname = args.savedir if args.savedir else args.expname
 print('Experiment dir:', expname)
 
-EDIT_TYPE = "ZOOM"
+EDIT_TYPE = "COLOR"
 assert EDIT_TYPE in ["COLOR", "ZOOM"], f"{EDIT_TYPE = }"
 print(f"[INFO] Edit type is {EDIT_TYPE}")
 
@@ -116,14 +116,18 @@ class WalkLearner(pl.LightningModule):
             # convert (HxW, 3) to (H, W, 3)
             img_size = int(np.sqrt(original_image.shape[0]))
             image = original_image.view(img_size, img_size, 3)
-            # print(f"[DEBUG] image.shape = {image.shape}")
-            # print(f"[DEBUG] alpha.shape = {alpha.shape}")
+            max_, _ = torch.max(image, dim = -1, keepdim = True)
+            image = image / (max_ + 1e-5)
             
             # do the edit by balancing the color channels
             new_image = torch.zeros_like(image)
-            new_image = image * alpha.unsqueeze(0).unsqueeze(0)
+            new_image = torch.matmul(image, torch.diag(alpha))
             max_, _ = torch.max(new_image, dim = -1, keepdim = True)
             new_image = new_image / (max_ + 1e-5) # normalize
+            
+            mask = ((torch.min(image, dim=-1)[0]) >= 1-(1e-2))  # once again, numerical accuracy is the bane of my existence
+            mask = mask.unsqueeze(-1).expand(-1, -1, 3)
+            new_image[mask] = 1.0
             
             new_image = new_image.view(original_image.shape)
             assert new_image.shape == original_image.shape, f"{new_image.shape = }, {original_image.shape = }"
@@ -227,6 +231,7 @@ class WalkLearner(pl.LightningModule):
         
         if EDIT_TYPE == "COLOR":
             alpha = torch.rand(3)
+            alpha = alpha / torch.norm(alpha)   # normalize to lie on unit sphere
         elif EDIT_TYPE == "ZOOM":
             alpha = 2*torch.rand(1)-1  # in [-1,1)
         
@@ -290,7 +295,7 @@ checkpoint_callback = ModelCheckpoint(
 def run():
     # make pl trainer
     tb_logger = TensorBoardLogger("tb_logs", name="my_model")
-    trainer = pl.Trainer(accelerator = "gpu", devices = 4, max_epochs = -1, logger = tb_logger, log_every_n_steps = 1, enable_checkpointing=True, callbacks=[checkpoint_callback])
+    trainer = pl.Trainer(accelerator = "gpu", devices = 2, max_epochs = -1, logger = tb_logger, log_every_n_steps = 1, enable_checkpointing=True, callbacks=[checkpoint_callback])
     trainer.fit(pl_model, dataloader)
 
 if __name__ == '__main__':
