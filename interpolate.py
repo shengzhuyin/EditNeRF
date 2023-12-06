@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(42)
 
 def interpolate():
-    INTEROP_TYPE = "ZOOM_TEST"
+    INTEROP_TYPE = "COLOR_TEST"
     INTEROP_TYPE_LIST = ["COLOR", "SHAPE", "COLOR_TEST", "ZOOM_TEST"]
     assert INTEROP_TYPE in INTEROP_TYPE_LIST, f"interop type should be one of {INTEROP_TYPE_LIST}, passed {INTEROP_TYPE}"
     
@@ -81,7 +81,7 @@ def interpolate():
         import torch, pytorch_lightning as pl, numpy as np
         from walk_learning import WalkLearner
         # model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_17/checkpoints/last.ckpt")
-        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_33/checkpoints/last.ckpt")
+        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_33/checkpoints/last.ckpt")    # for zoom edits
         w = model["state_dict"]['w']
         return w
     
@@ -99,22 +99,41 @@ def interpolate():
             print(f"[DEBUG] Generated {alphas = }")
             
             if walk_direction != -1:    # interpolate in a single color
-                alpha_ = torch.zeros(size = (n, 3))
-                alpha_[:, walk_direction] = alphas
-                print(f"[DEBUG] Generated {alpha_ = }")
+                raise NotImplementedError(f"walk_direction = {walk_direction} not implemented")
+            
+                # alpha_ = torch.zeros(size = (n, 3))
+                # alpha_[:, walk_direction] = alphas
+                # print(f"[DEBUG] Generated {alpha_ = }")
                 
-                displacement = torch.matmul(alpha_, w.T)
-                new_ = torch.zeros(size = (n, args.style_dim))
-                for i in range(n):
-                    disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
-                    assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
-                    new_[i] = disp
-                displacement = new_
+                # displacement = torch.matmul(alpha_, w.T)
+                # new_ = torch.zeros(size = (n, args.style_dim))
+                # for i in range(n):
+                #     disp = torch.cat([torch.zeros(args.style_dim//2), displacement[i]], dim = 0)
+                #     assert disp.shape == (args.style_dim, ), f"{disp.shape = }"
+                #     new_[i] = disp
+                # displacement = new_
                 
-                assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
+                # assert displacement.shape == (n, args.style_dim), f"{displacement.shape = }"
                 
             else: # interpolate in all colors
-                alpha_ = torch.stack([alphas] * 3, dim = 1)
+                # get alpha
+                np.random.seed(42)
+                torch.manual_seed(42)
+                p1, p2 = torch.tensor([1, 0, 0]), torch.randn(3)
+                p1, p2 = p1 / p1.norm(), p2 / p2.norm()
+                
+                theta_0, theta_1 = torch.acos(p1[2]), torch.acos(p2[2])
+                phi_0, phi_1 = torch.atan2(p1[1], p1[0]), torch.atan2(p2[1], p2[0])
+                t = torch.linspace(0, 2, n)
+                t[t > 1] = 2 - t[t > 1]
+                
+                # interpolate theta and phi
+                thetas = theta_0 * (1 - t) + theta_1 * t
+                phis = phi_0 * (1 - t) + phi_1 * t
+                
+                # convert back to alpha
+                alpha_ = torch.stack([torch.sin(thetas) * torch.cos(phis), torch.sin(thetas) * torch.sin(phis), torch.cos(thetas)], dim = 1)
+                assert alpha_.shape == (n, 3), f"{alphas.shape = }"
                 print(f"[DEBUG] Generated {alpha_ = }")
                 
                 displacement = torch.matmul(alpha_, w.T)
