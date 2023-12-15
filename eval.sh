@@ -1,7 +1,7 @@
 #!/bin/bash
 # python3 -u test_nerf.py --config configs/photoshapes/config.txt --render_test --render_train --load_it 40000  1>photoshapes_testing.log 2>&1
 # python3 -u test_nerf.py --config configs/photoshapes/config.txt --render_test --render_train --load_it 450000 --testskip 50000  1>photoshapes_testing.log 2>&1
-python3 -u test_nerf.py --config configs/plane_dataset/config.txt --render_test --render_train --load_it 990000 --testskip 50000 1>plane_testing.log 2>&1
+python3 -u test_nerf.py --config configs/plane_dataset/config.txt --render_test --render_train --load_it 1440000 --testskip 50000 1>plane_testing.log
 
 # make process pool
 # processes=()

@@ -81,7 +81,7 @@ def interpolate():
         import torch, pytorch_lightning as pl, numpy as np
         from walk_learning import WalkLearner
         # model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_17/checkpoints/last.ckpt")
-        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_33/checkpoints/last.ckpt")    # for zoom edits
+        model =  torch.load("/scratch/users/akshat7/cv/temp/editnerf/tb_logs/my_model/version_35/checkpoints/last.ckpt")    # for zoom edits
         w = model["state_dict"]['w']
         return w
     
@@ -119,7 +119,7 @@ def interpolate():
                 # get alpha
                 np.random.seed(42)
                 torch.manual_seed(42)
-                p1, p2 = torch.tensor([1, 0, 0]), torch.randn(3)
+                p1, p2 = torch.tensor([1, 0, 0], dtype = torch.float32), torch.tensor([0, 1, 0], dtype = torch.float32)
                 p1, p2 = p1 / p1.norm(), p2 / p2.norm()
                 
                 theta_0, theta_1 = torch.acos(p1[2]), torch.acos(p2[2])

@@ -8,6 +8,7 @@ use_styles = True
 separate_codes = True
 
 use_viewdirs = True
+lrate = 1e-4
 lrate_decay = 500
 
 N_rand = 1024

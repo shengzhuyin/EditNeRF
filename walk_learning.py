@@ -90,7 +90,7 @@ class WalkLearner(pl.LightningModule):
         self.model_fine.to(self.w.device)
         
     def configure_optimizers(self):
-        return optim.Adam([self.w], lr = 1e-4)
+        return optim.Adam([self.w], lr = 1e-5)
         
     def lies_in(self, alpha, min_, max_):
         if alpha >= min_ and alpha <= max_:
@@ -295,7 +295,7 @@ checkpoint_callback = ModelCheckpoint(
 def run():
     # make pl trainer
     tb_logger = TensorBoardLogger("tb_logs", name="my_model")
-    trainer = pl.Trainer(accelerator = "gpu", devices = 2, max_epochs = -1, logger = tb_logger, log_every_n_steps = 1, enable_checkpointing=True, callbacks=[checkpoint_callback])
+    trainer = pl.Trainer(accelerator = "gpu", devices = 4, max_epochs = -1, logger = tb_logger, log_every_n_steps = 1, enable_checkpointing=True, callbacks=[checkpoint_callback])
     trainer.fit(pl_model, dataloader)
 
 if __name__ == '__main__':
