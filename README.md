@@ -1,5 +1,9 @@
 Final Research Report Available CS543_Final_Project.pdf in repo
 
+Shengzhu Yin yin20@illinois.edu
+Akshat Sharma akshat7@illinois.edu
+Alan Yao alaney2@illinois.edu
+
 We evaluate the latent space induced by training NeRF
 models over multiple object instances. We learn linear
 walks in the NeRF latent space to determine if generative
